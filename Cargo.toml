@@ -1,6 +1,6 @@
 [package]
 name = "wasm-fft-analyzer"
-version = "0.2.0"
+version = "0.4.0"
 authors = ["Devin Davies <devin.m.davies@gmail.com>"]
 edition = "2018"
 
