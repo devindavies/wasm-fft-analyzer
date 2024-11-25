@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-
 use spectrum_analyzer::scaling::SpectrumDataStats;
 use spectrum_analyzer::windows::hann_window;
 use spectrum_analyzer::{samples_fft_to_spectrum, FrequencyLimit};
@@ -8,7 +6,7 @@ mod utils;
 
 #[wasm_bindgen(getter_with_clone)]
 pub struct WasmSpectrumAnalyzer {
-    visualize_spectrum: RefCell<Vec<(f64, f64)>>,
+    visualize_spectrum: Vec<(f64, f64)>,
     sample_rate: u32,
     fft_size: usize,
 }
@@ -35,7 +33,7 @@ impl WasmSpectrumAnalyzer {
         WasmSpectrumAnalyzer {
             sample_rate,
             fft_size,
-            visualize_spectrum: RefCell::new(vec![(0.0, 0.0); fft_size / 2]),
+            visualize_spectrum: vec![(0.0, 0.0); fft_size / 2],
         }
     }
 
@@ -65,7 +63,7 @@ impl WasmSpectrumAnalyzer {
         latest_spectrum
             .data()
             .iter()
-            .zip(self.visualize_spectrum.borrow_mut().iter_mut())
+            .zip(self.visualize_spectrum.iter_mut())
             .for_each(|((fr_new, fr_val_new), (fr_old, fr_val_old))| {
                 // actually only required in very first iteration
                 *fr_old = fr_new.val() as f64;
@@ -79,8 +77,6 @@ impl WasmSpectrumAnalyzer {
 
         let window = self
             .visualize_spectrum
-            .borrow()
-            .clone()
             .iter()
             .map(|&(_frequency, value)| value as f32)
             .collect();
