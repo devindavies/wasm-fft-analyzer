@@ -9,6 +9,7 @@ pub struct WasmSpectrumAnalyzer {
     visualize_spectrum: Vec<(f64, f64)>,
     sample_rate: u32,
     fft_size: usize,
+    output: Vec<f32>,
 }
 
 fn normalize(fr_val: f32, _stats: &SpectrumDataStats) -> f32 {
@@ -34,10 +35,11 @@ impl WasmSpectrumAnalyzer {
             sample_rate,
             fft_size,
             visualize_spectrum: vec![(0.0, 0.0); fft_size / 2],
+            output: vec![0.0; fft_size / 2],
         }
     }
 
-    pub fn analyze(&mut self, audio_samples: Vec<f32>, min_freq: u32, max_freq: u32) -> Vec<f32> {
+    pub fn analyze(&mut self, audio_samples: Vec<f32>, min_freq: u32, max_freq: u32) {
         if audio_samples.len() < self.fft_size {
             panic!("Insufficient samples passed to analyze(). Expected an array containing {} elements but got {}", self.fft_size, audio_samples.len());
         }
@@ -75,12 +77,14 @@ impl WasmSpectrumAnalyzer {
                 *fr_val_old = old_val + new_val as f64;
             });
 
-        let window = self
+        self.output = self
             .visualize_spectrum
             .iter()
             .map(|&(_frequency, value)| value as f32)
             .collect();
+    }
 
-        window
+    pub fn ouput(&self) -> *const f32 {
+        self.output.as_ptr()
     }
 }
