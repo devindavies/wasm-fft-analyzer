@@ -3,6 +3,7 @@ name = "wasm-fft-analyzer"
 version = "0.9.0"
 authors = ["Devin Davies <devin.m.davies@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/devindavies/wasm-fft-analyzer"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -7,7 +7,8 @@ on:
       - "v[0-9]+.[0-9]+.[0-9]+*"
 
 permissions:
-  contents: write
+  contents: write # create the GitHub Release
+  id-token: write # npm trusted publishing (OIDC)
 
 jobs:
   release:
@@ -57,15 +58,14 @@ jobs:
           gh release create "$GITHUB_REF_NAME" ./*.tgz \
             --title "$GITHUB_REF_NAME" --generate-notes $prerelease
 
+      # Trusted publishing needs npm >= 11.5.1 (bundled with Node 24).
+      # No registry-url / NODE_AUTH_TOKEN: npm authenticates via OIDC.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          node-version: 24
 
       - name: Publish to npm
         working-directory: pkg
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           tag=""
           case "$GITHUB_REF_NAME" in *-*) tag="--tag next" ;; esac
