@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Verify tag matches Cargo.toml version
         run: |
@@ -60,9 +60,11 @@ jobs:
 
       # Trusted publishing needs npm >= 11.5.1 (bundled with Node 24).
       # No registry-url / NODE_AUTH_TOKEN: npm authenticates via OIDC.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - name: Publish to npm
         working-directory: pkg
