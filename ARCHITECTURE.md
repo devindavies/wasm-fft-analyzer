@@ -60,7 +60,7 @@ None. State is in-memory only, held inside each `WasmSpectrumAnalyzer` instance 
 
 | Service | Purpose | Integration Method |
 |---------|---------|-------------------|
-| npm registry | Package distribution | `wasm-pack publish` |
+| npm registry | Package distribution | `npm publish` (via release workflow) |
 
 ## 6. Deployment & Infrastructure
 
@@ -68,7 +68,7 @@ None. State is in-memory only, held inside each `WasmSpectrumAnalyzer` instance 
 
 **Key Services Used:** npm registry
 
-**CI/CD Pipeline:** GitHub Actions — `.github/workflows/ci.yml` (`cargo test --all`, `cargo fmt --all -- --check`, `cargo clippy --all -- -D warnings`). Legacy `.travis.yml` and `.appveyor.yml` also exist. <!-- TODO: fill in how publishing is triggered -->
+**CI/CD Pipeline:** GitHub Actions — `.github/workflows/ci.yml` (`cargo test --all`, `cargo fmt --all -- --check`, `cargo clippy --all -- -D warnings`). Publishing is triggered by pushing a `vX.Y.Z` tag, which runs `.github/workflows/release.yml`: it checks the tag against the `Cargo.toml` version, re-runs test/fmt/clippy, builds with `wasm-pack build --release --target web --scope devinmdavies`, creates a GitHub Release with the packed tarball, then runs `npm publish` using the `NPM_TOKEN` secret. Tags with a hyphen (e.g. `v1.0.0-rc.1`) are prereleases published under the `next` dist-tag. Legacy `.travis.yml` and `.appveyor.yml` also exist.
 
 **Monitoring & Logging:** Panic messages to `console.error` via `console_error_panic_hook`.
 
