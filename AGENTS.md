@@ -91,7 +91,7 @@ If the `openspec-` and `accelint-qrspi-archive` skills are available:
 Ask for approval before taking any of the actions below. Do not take the action first and ask afterward.
 
 - Publish to npm (`wasm-pack publish`) or bump the crate or package version.
-- Change a public API or shared contract: exported method names or signatures, or the pointer returned by `ouput()` into WASM memory. Do not rename or "fix" the misspelled `ouput()` export without approval.
+- Change a public API or shared contract: exported method names or signatures, or the pointer returned by `output()` into WASM memory. Do not reintroduce the old misspelled `ouput()` export name.
 - Add or upgrade a runtime dependency.
 - Delete a tracked file or begin a broad refactor.
 - Change `.github/` workflows, Dependabot config, or other configuration that CI or publishing consumes.
@@ -123,7 +123,7 @@ Before making a performance trade-off in performance-sensitive code, ask for app
 - the specific non-performance cost; and
 - the validation command and acceptable regression limit.
 
-The repository has no benchmark or profiling setup. If you need a measurement, ask which method to use instead of inventing one. <!-- TODO: fill in benchmark command once one exists -->
+Measure `analyze` with `cargo run --release --example bench_analyze` (`examples/bench_analyze.rs`; counting global allocator; reports allocations, bytes and median microseconds per call). Collect the baseline on the unmodified code before changing `analyze`, and in the same session compare after. Unless the owner approves otherwise, `analyze` must keep allocations and bytes per call identical to the baseline and median time within +10%. For any other path or metric, ask which method to use instead of inventing one.
 
 Record the affected entry point, measurement, trade-off, and approval decision in the PR description.
 

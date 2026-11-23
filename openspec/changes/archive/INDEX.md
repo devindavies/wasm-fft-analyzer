@@ -1,0 +1,3 @@
+| Change | Date | Decision | Specs touched | Status |
+| --- | --- | --- | --- | --- |
+| absolute-bin-spectrum-output | 2026-11-23 | recover absolute bin via round(freq / bin width), skip Nyquist; smooth in place per absolute bin; zero masked bins every call, re-entry restarts from 0; slice-fill zeroing, no allocation; keep validation ahead of state changes; ship mapping, masking and smoothing as one change; inline native tests; rename ouput() to output(), no alias; Cargo.toml version 0.9.0; bench_analyze regression example; update config spelling and rules.specs key | spectrum-output | current |

@@ -39,11 +39,12 @@ context: |
   ## Domain Concepts
   - WasmSpectrumAnalyzer: wasm-bindgen class constructed with sample_rate and fft_size; owns all buffers
   - Hann window: coefficients precomputed in the constructor, applied to input samples before the FFT to reduce spectral leakage
-  - Smoothing: exponential filter blending 0.9 old and 0.1 new into visualize_spectrum each analyze call
-  - Output buffer: fft_size/2 f32 values; JS reads it through ouput() (sic), a raw pointer into WASM linear memory
-  - Frequency range: analyze takes min_freq and max_freq bounding the spectrum bins
+  - Smoothing: per-bin exponential filter blending 0.9 old and 0.1 new, applied in place by absolute bin index in visualize_spectrum on each analyze call
+  - Output buffer: fft_size/2 f32 values; JS reads it through output(), a raw pointer into WASM linear memory; output[i] is always FFT bin i regardless of min_freq; bins outside the requested range are 0 on every call and a bin re-entering the range restarts from 0
+  - Frequency range: analyze takes min_freq and max_freq selecting which bins are populated; the absolute bin is recovered as round(freq / (sample_rate / fft_size)) and the Nyquist bin is skipped
 
   ## Performance Targets
+  - Regression benchmark: examples/bench_analyze.rs (cargo run --release --example bench_analyze) reports allocations, bytes and median microseconds per analyze call using a counting global allocator; a change must keep allocations and bytes per call identical to the baseline and median time within +10%
   - Latency / frame budget: # TODO: fill in
   - Memory / .wasm size limit: # TODO: fill in
   - Hot path: WasmSpectrumAnalyzer::analyze runs once per audio frame. Windowing is allocation-free; the spectrum-analyzer FFT call still allocates its owned result per call.
@@ -64,9 +65,9 @@ context: |
   ## Testing Patterns
   - Pattern:        Arrange, Act, Assert
   - Structure:      Flat test functions with snake_case names, plain assert_eq!
-  - File location:  tests/web.rs for wasm tests (gated by #![cfg(target_arch = "wasm32")], so invisible to native cargo test); no native tests exist yet
-  - Fixtures:       None yet
-  - Coverage gap:   tests/web.rs holds one placeholder test and nothing exercises WasmSpectrumAnalyzer
+  - File location:  inline #[cfg(test)] module in src/lib.rs for native tests (can read the private output field); tests/web.rs for wasm tests (gated by #![cfg(target_arch = "wasm32")], so invisible to native cargo test)
+  - Fixtures:       sine-wave helper in the src/lib.rs test module
+  - Coverage gap:   wasm-pack test --headless --firefox is not run in CI and tests/web.rs holds only a placeholder
   - Verification:   Native tests run in CI; wasm-pack tests do not
 
   # NOTE: Commit message convention, PR workflow, and tool preferences
@@ -77,7 +78,7 @@ context: |
   # ═══════════════════════════════════════════════════════════════════════════
 
   ## Code Anti-Patterns
-  - Misspelled exported name ouput(): part of the public contract, do not copy the spelling into new exports
+  - Exported pointer accessor is output(): part of the public contract; do not reintroduce the old misspelled name ouput()
   - unwrap() on the FFT result and panic! on short input in analyze: new code should not add more panics across the JS boundary
   - debug_assert! as the only check on values: compiled out in release builds
   - Commented-out dead code (dB scaling in normalize)
@@ -103,7 +104,7 @@ rules:
     - State the requirement or ticket driving this change
     - Define scope boundaries, explicitly listing what is OUT of scope
     - Keep under 100 lines (tight and focused)
-    - Flag any change to the exported wasm-bindgen API, including method names, signatures and the pointer returned by ouput()
+    - Flag any change to the exported wasm-bindgen API, including method names, signatures and the pointer returned by output()
     - Call out any effect on WasmSpectrumAnalyzer::analyze performance
     - Note any new or upgraded runtime dependency
 
@@ -131,7 +132,7 @@ rules:
     - Call out inter-task dependencies explicitly
     - "Tag tasks with the affected area, for example [API], [DSP], [TEST] or [BUILD]"
 
-  spec:
+  specs:
     - Use Given/When/Then for behaviour specifications
     - Include concrete example data, such as sample_rate 44100, fft_size 1024 and a sine-wave input
     - Document edge cases explicitly, such as short input, non-power-of-two fft_size, min_freq above max_freq, and NaN samples
