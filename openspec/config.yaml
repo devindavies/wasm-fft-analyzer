@@ -1,0 +1,144 @@
+schema: spec-driven
+githubCopilot:
+  cloudAgent: false
+skillsScope: project
+
+# Project Context
+# Injected into every AI-generated artifact (proposal, design, spec, tasks).
+# QRSPI principle: objective research layer — facts only, no opinions.
+
+context: |
+  # ═══════════════════════════════════════════════════════════════════════════
+  # STACK FACTS
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  ## Project Identity
+  wasm-fft-analyzer: Rust library compiled to WebAssembly that computes a smoothed frequency spectrum from audio samples for JS visualizers.
+  Single crate, no workspace (cdylib + rlib). No frontend; consumed by external JS/TS apps.
+  Build: wasm-pack build (output pkg/, gitignored). No Makefile or task runner.
+  Package manager: cargo. Published to npm as @devinmdavies/wasm-fft-analyzer (ES module + .wasm) via manual wasm-pack publish. No root package.json.
+
+  ## Tech Stack
+  - Runtime:            WebAssembly (wasm32-unknown-unknown) in browser/JS hosts; native target for cargo test
+  - Language:           Rust, edition 2018, no MSRV or rust-toolchain pinned
+  - Framework:          wasm-bindgen 0.2.100 (JS bindings)
+  - Key Libraries:      spectrum-analyzer 1.6.0 (FFT), console_error_panic_hook 0.1.7 (optional, default feature)
+  - Data Layer:         None. In-memory state per WasmSpectrumAnalyzer instance. Input Float32Array samples; output is f32 buffer exposed as a pointer into WASM linear memory.
+  - Testing:            cargo test (native); wasm-bindgen-test 0.3.50 via wasm-pack test --headless --firefox (not run in CI)
+  - Linting/Formatting: rustfmt and clippy with -D warnings, default config (no rustfmt.toml or clippy.toml)
+  - Build Tools:        wasm-pack; release profile opt-level 3, lto fat, codegen-units 1
+  - CI/CD:              GitHub Actions ci.yml (test, format, clippy jobs on push and PR). Dependabot for cargo, daily. No automated publish.
+  - Versioning:         Manual version bumps in Cargo.toml; no changelog, tags or release tooling. Cargo.lock is gitignored.
+
+  ## Architecture Patterns
+  - Organisation: Single-file library; src/lib.rs holds WasmSpectrumAnalyzer, src/utils.rs holds the panic-hook setup
+  - Shared code:  None
+  - Path aliases: None
+  - Key patterns: Buffers preallocated in the constructor and reused per call; results exposed to JS as a raw pointer rather than copied across the boundary
+
+  ## Domain Concepts
+  - WasmSpectrumAnalyzer: wasm-bindgen class constructed with sample_rate and fft_size; owns all buffers
+  - Hann window: coefficients precomputed in the constructor, applied to input samples before the FFT to reduce spectral leakage
+  - Smoothing: per-bin exponential filter blending 0.9 old and 0.1 new, applied in place by absolute bin index in visualize_spectrum on each analyze call
+  - Output buffer: fft_size/2 f32 values; JS reads it through output(), a raw pointer into WASM linear memory; output[i] is always FFT bin i regardless of min_freq; bins outside the requested range are 0 on every call and a bin re-entering the range restarts from 0
+  - Frequency range: analyze takes min_freq and max_freq selecting which bins are populated; the absolute bin is recovered as round(freq / (sample_rate / fft_size)) and the Nyquist bin is skipped
+
+  ## Performance Targets
+  - Regression benchmark: examples/bench_analyze.rs (cargo run --release --example bench_analyze) reports allocations, bytes and median microseconds per analyze call using a counting global allocator; a change must keep allocations and bytes per call identical to the baseline and median time within +10%
+  - Latency / frame budget: # TODO: fill in
+  - Memory / .wasm size limit: # TODO: fill in
+  - Hot path: WasmSpectrumAnalyzer::analyze runs once per audio frame. Windowing is allocation-free; the spectrum-analyzer FFT call still allocates its owned result per call.
+  - Constraints: no per-call allocation in this crate's own code; bounded loops over fft_size
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PATTERNS TO FOLLOW
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  ## Code Patterns
+  - Exports:         Only the wasm-bindgen API is public; helpers stay private (mod utils, fn normalize)
+  - Naming:          Idiomatic Rust: snake_case functions and fields, PascalCase types, SCREAMING_SNAKE_CASE constants
+  - Error handling:  Currently panic! and unwrap (traps in WASM); no Result returns. Existing behavior, not a model for new code.
+  - Validation:      Arguments crossing the JS-to-WASM boundary are untrusted and must be validated in the exported method
+  - Safety:          No unsafe blocks in the crate today
+  - Documentation:   # TODO: fill in (no /// doc comments exist yet)
+
+  ## Testing Patterns
+  - Pattern:        Arrange, Act, Assert
+  - Structure:      Flat test functions with snake_case names, plain assert_eq!
+  - File location:  inline #[cfg(test)] module in src/lib.rs for native tests (can read the private output field); tests/web.rs for wasm tests (gated by #![cfg(target_arch = "wasm32")], so invisible to native cargo test)
+  - Fixtures:       sine-wave helper in the src/lib.rs test module
+  - Coverage gap:   wasm-pack test --headless --firefox is not run in CI and tests/web.rs holds only a placeholder
+  - Verification:   Native tests run in CI; wasm-pack tests do not
+
+  # NOTE: Commit message convention, PR workflow, and tool preferences
+  # are behavioral — they belong in AGENTS.md, not here.
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PATTERNS TO AVOID
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  ## Code Anti-Patterns
+  - Exported pointer accessor is output(): part of the public contract; do not reintroduce the old misspelled name ouput()
+  - unwrap() on the FFT result and panic! on short input in analyze: new code should not add more panics across the JS boundary
+  - debug_assert! as the only check on values: compiled out in release builds
+  - Commented-out dead code (dB scaling in normalize)
+  - Deep nesting instead of early returns
+
+  ## Performance Anti-Patterns
+  - Heap allocation inside analyze in this crate's own code
+  - Recomputing per-instance constants (such as window coefficients) per call
+  - Unbounded loops over caller-supplied sizes
+
+  ## Testing Anti-Patterns
+  - Placeholder assertions that do not exercise the crate (assert_eq!(1 + 1, 2))
+  - Relying on wasm-only tests for logic that could run natively under cargo test
+  - Loose assertions that do not check values
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PER-ARTIFACT RULES
+# ═══════════════════════════════════════════════════════════════════════════
+
+rules:
+  proposal:
+    # QRSPI: Scope definition, not a plan.
+    - State the requirement or ticket driving this change
+    - Define scope boundaries, explicitly listing what is OUT of scope
+    - Keep under 100 lines (tight and focused)
+    - Flag any change to the exported wasm-bindgen API, including method names, signatures and the pointer returned by output()
+    - Call out any effect on WasmSpectrumAnalyzer::analyze performance
+    - Note any new or upgraded runtime dependency
+
+  design:
+    # QRSPI: The "brain surgery" checkpoint, reviewed before any code is written.
+    - Start with "Current State" covering what the code does today, key files, entry points and data flows
+    - '"Desired End State" covering what changes and what stays the same'
+    - '"Patterns to Follow": ONLY if specific files or functions exist to reference'
+    - '"Patterns to Avoid": ONLY if specific anti-patterns apply'
+    - '"Open Questions": genuine uncertainties, or state "No unresolved questions."'
+    - '"Resolved Decisions": numbered (Decision 1, Decision 2...) with Choice, Rationale, Alternatives Considered'
+    - Use ASCII diagrams for data flows and memory layout
+    - Include a "Performance Implications" section covering allocations in analyze and the wasm-bindgen boundary
+    - Describe memory layout and pointer validity whenever WASM linear memory is exposed to JS
+    - Keep under 250 lines total
+
+  tasks:
+    # QRSPI: Vertical slicing for early failure detection.
+    - Order as vertical slices, each delivering a testable end-to-end path
+    - Do NOT group by architectural layer unless explicitly justified
+    - 'Each task MUST include a "Test:" line describing what to verify before proceeding'
+    - Name the verification commands per task (cargo test --all, cargo fmt --all -- --check, cargo clippy --all -- -D warnings; add wasm-pack test --headless --firefox for wasm-bindgen-facing code)
+    - Prefer 3 to 5 major slices; more suggests scope is too large
+    - Max 2 hours per task; break larger work into subtasks
+    - Call out inter-task dependencies explicitly
+    - "Tag tasks with the affected area, for example [API], [DSP], [TEST] or [BUILD]"
+
+  specs:
+    - Use Given/When/Then for behaviour specifications
+    - Include concrete example data, such as sample_rate 44100, fft_size 1024 and a sine-wave input
+    - Document edge cases explicitly, such as short input, non-power-of-two fft_size, min_freq above max_freq, and NaN samples
+
+# ═══════════════════════════════════════════════════════════════════════════
+# RELATED DOCUMENTATION
+# ═══════════════════════════════════════════════════════════════════════════
+# - ARCHITECTURE.md: System overview, deployment, component interactions, data flows
+# - AGENTS.md: Agent behavior rules, workflow procedures, communication style
