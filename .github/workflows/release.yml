@@ -44,6 +44,13 @@ jobs:
       - name: Build package
         run: wasm-pack build --release --target web --scope devinmdavies
 
+      # wasm-bindgen's glue needs TextDecoder/TextEncoder at load, which
+      # AudioWorklets lack. Guard it (no-op where the globals exist).
+      - name: Patch glue for AudioWorklet
+        run: |
+          node --test scripts/patch-glue.test.mjs
+          node scripts/patch-glue.mjs pkg
+
       - name: Pack tarball
         run: npm pack ./pkg --pack-destination .
 

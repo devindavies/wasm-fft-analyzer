@@ -11,6 +11,7 @@ wasm-fft-analyzer/
 │   └── utils.rs         # Panic-hook setup (console_error_panic_hook)
 ├── examples/
 │   └── bench_analyze.rs # Native regression benchmark for analyze (counting global allocator)
+├── scripts/             # patch-glue.mjs: post-build guard so the glue loads without TextDecoder/TextEncoder (+ node:test tests)
 ├── tests/web.rs         # wasm-bindgen-test browser tests (wasm32 only; currently a placeholder)
 ├── pkg/                 # wasm-pack output published to npm (gitignored build artifact)
 ├── test.js              # Ad-hoc JS script; contains generated wasm-bindgen glue code
@@ -68,7 +69,7 @@ None. State is in-memory only, held inside each `WasmSpectrumAnalyzer` instance 
 
 **Key Services Used:** npm registry
 
-**CI/CD Pipeline:** GitHub Actions — `.github/workflows/ci.yml` (`cargo test --all`, `cargo fmt --all -- --check`, `cargo clippy --all -- -D warnings`). Publishing is triggered by pushing a `vX.Y.Z` tag, which runs `.github/workflows/release.yml`: it checks the tag against the `Cargo.toml` version, re-runs test/fmt/clippy, builds with `wasm-pack build --release --target web --scope devinmdavies`, creates a GitHub Release with the packed tarball, then runs `npm publish` using npm trusted publishing (GitHub OIDC, no stored token; the trusted publisher is configured on npmjs.com for `release.yml`). Tags with a hyphen (e.g. `v1.0.0-rc.1`) are prereleases published under the `next` dist-tag. Legacy `.travis.yml` and `.appveyor.yml` also exist.
+**CI/CD Pipeline:** GitHub Actions — `.github/workflows/ci.yml` (`cargo test --all`, `cargo fmt --all -- --check`, `cargo clippy --all -- -D warnings`). Publishing is triggered by pushing a `vX.Y.Z` tag, which runs `.github/workflows/release.yml`: it checks the tag against the `Cargo.toml` version, re-runs test/fmt/clippy, builds with `wasm-pack build --release --target web --scope devinmdavies`, runs `scripts/patch-glue.mjs pkg` (wasm-bindgen's glue calls `new TextDecoder` at load, which AudioWorklets lack; the script prepends a polyfill that installs only when the globals are missing, and fails if it finds nothing to patch), creates a GitHub Release with the packed tarball, then runs `npm publish` using npm trusted publishing (GitHub OIDC, no stored token; the trusted publisher is configured on npmjs.com for `release.yml`). Tags with a hyphen (e.g. `v1.0.0-rc.1`) are prereleases published under the `next` dist-tag. Legacy `.travis.yml` and `.appveyor.yml` also exist.
 
 **Monitoring & Logging:** Panic messages to `console.error` via `console_error_panic_hook`.
 
